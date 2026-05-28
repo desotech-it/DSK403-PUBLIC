@@ -11,6 +11,11 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE_PLACEHOLDER_FAKE_KEY_VALUE
 -----END PUBLIC KEY-----"
 fi
 
+# La PEM va indentata di 14 spazi per stare correttamente sotto 'publicKeys: |-'
+# (altrimenti '-----BEGIN PUBLIC KEY-----' viene interpretato da YAML come
+#  separatore di documento '---' e l'apply fallisce).
+PUB_INDENTED=$(printf '%s\n' "$PUB" | sed 's/^/              /')
+
 F=$(mktemp --suffix=.yaml)
 cat <<YAML >"$F"
 apiVersion: kyverno.io/v1
@@ -34,7 +39,7 @@ spec:
       - entries:
         - keys:
             publicKeys: |-
-${PUB}
+${PUB_INDENTED}
 YAML
 kubectl apply -f "$F"
 rm -f "$F"
