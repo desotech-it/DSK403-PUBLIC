@@ -69,8 +69,19 @@ with open(P, "w") as f:
 print("✅ encryption-config: identity is now first")
 PYSCRIPT
 
-  # Trigger apiserver restart by touching the manifest mtime
-  docker exec "$CTL" sh -c 'touch /etc/kubernetes/manifests/kube-apiserver.yaml'
+  # Force apiserver restart: move manifest OUT then back IN.
+  # 'touch' alone is not enough because kubelet hashes the manifest content,
+  # not its mtime, so it would not detect a no-op change.
+  echo "→ Forzo restart kube-apiserver (move out + sleep + move in)..."
+  docker exec "$CTL" mv /etc/kubernetes/manifests/kube-apiserver.yaml /tmp/kube-apiserver.yaml.tmp
+  # Aspetta che il vecchio pod sparisca davvero
+  for i in $(seq 1 30); do
+    if ! kubectl get --raw=/healthz 2>/dev/null | grep -qi 'ok'; then
+      break
+    fi
+    sleep 1
+  done
+  docker exec "$CTL" mv /tmp/kube-apiserver.yaml.tmp /etc/kubernetes/manifests/kube-apiserver.yaml
   wait_apiserver 120 || { echo "Fase 1: apiserver non torna su. Interrompo."; exit 1; }
 
   echo "→ Riscrivo tutti i Secret per portarli in chiaro (passano da identity)..."
